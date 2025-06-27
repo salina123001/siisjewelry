@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../services/firebase'; // 你等下會有這個檔
 import { User } from '../types';
 
 interface AuthModalProps {
@@ -14,23 +16,27 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onLogin, onRegister }) =
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Basic validation
     if (!email || !password || (!isLoginView && !name)) {
       setError('所有欄位皆為必填');
       return;
     }
 
-    // Mock authentication
-    const mockUser: User = { id: Date.now().toString(), name: isLoginView ? 'Mock User' : name, email };
-
-    if (isLoginView) {
-      onLogin(mockUser);
-    } else {
-      onRegister(mockUser);
+    try {
+      if (isLoginView) {
+        const res = await signInWithEmailAndPassword(auth, email, password);
+        const user = res.user;
+        onLogin({ id: user.uid, name: user.displayName || '使用者', email: user.email || '' });
+      } else {
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        const user = res.user;
+        onRegister({ id: user.uid, name, email: user.email || '' });
+      }
+    } catch (err: any) {
+      setError(err.message || '登入/註冊發生錯誤');
     }
   };
 
@@ -50,23 +56,23 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onLogin, onRegister }) =
               註冊
             </button>
           </div>
-          
+
           <h2 className="text-2xl font-bold text-center mb-6">{isLoginView ? '歡迎回來' : '創建您的帳戶'}</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLoginView && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">您的姓名</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" />
+                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
               </div>
             )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">密碼</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" />
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
             </div>
 
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
