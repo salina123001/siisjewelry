@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './services/firebase';
+
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Features from './components/Features';
@@ -11,23 +15,48 @@ import ProductModal from './components/ProductModal';
 import Cart from './components/Cart';
 import AuthModal from './components/AuthModal';
 import Toast from './components/Toast';
-import CheckoutPage from './components/CheckoutPage'; // 新增
+import CheckoutPage from './components/CheckoutPage';
+
+import AdminPage from './components/admin/AdminPage';
+import ProductManagement from './components/admin/ProductManagement';
+import MemberManagement from './components/admin/MemberManagement';
+import OrderManagement from './components/admin/OrderManagement';
+import PrivateRoute from './components/PrivateRoute';
+import LoginPage from './components/LoginPage';
+
 import { Product, CartItem, User } from './types';
 
-const App: React.FC = () => {
+// 將需要 navigate 的邏輯提取到組件內部
+const AppContent: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false); // 新增結帳頁面狀態
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser({
+          uid: user.uid,
+          email: user.email || '',
+          name: user.displayName || user.email || 'User',
+        });
+      } else {
+        setCurrentUser(null);
+      }
+      setLoadingAuth(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (toastMessage) {
-      const timer = setTimeout(() => {
-        setToastMessage(null);
-      }, 3000);
+      const timer = setTimeout(() => setToastMessage(null), 3000);
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
@@ -44,33 +73,32 @@ const App: React.FC = () => {
       }
       return [...prevItems, { ...product, quantity }];
     });
-    setSelectedProduct(null); // Close modal after adding
+    setSelectedProduct(null);
     setToastMessage(`${product.name} 已成功加入購物車！`);
-    setIsCartOpen(true); // Open cart sidebar
+    setIsCartOpen(true);
   };
-  
+
   const handleUpdateQuantity = (productId: number, newQuantity: number) => {
     setCartItems(prevItems =>
       prevItems
         .map(item =>
           item.id === productId ? { ...item, quantity: newQuantity } : item
         )
-        .filter(item => item.quantity > 0) // 同時處理移除數量為0的商品
+        .filter(item => item.quantity > 0)
     );
   };
-  
+
   const handleRemoveFromCart = (productId: number) => {
     setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
   };
-  
+
   const handleCheckout = () => {
     if (!currentUser) {
       setIsCartOpen(false);
       setIsAuthModalOpen(true);
     } else {
-      // 前往結帳頁面
       setIsCartOpen(false);
-      setIsCheckoutOpen(true);
+      navigate('/checkout'); // 使用 navigate 而不是 window.location.href
     }
   };
 
@@ -80,7 +108,6 @@ const App: React.FC = () => {
   };
 
   const handleRegister = (user: User) => {
-    // Simulate registration and login
     setCurrentUser(user);
     setIsAuthModalOpen(false);
   };
@@ -94,34 +121,26 @@ const App: React.FC = () => {
   };
 
   const handlePlaceOrder = () => {
-    // 模擬下單成功
     alert(`感謝 ${currentUser?.name}！您的訂單已成功提交，我們會盡快處理。`);
     setCartItems([]);
-    setIsCheckoutOpen(false);
+    navigate('/'); // 使用 navigate 而不是 window.location.href
   };
-  
+
   const cartItemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
-  // 如果結帳頁面打開，只渲染結帳頁面和頁首頁尾
-  if (isCheckoutOpen && currentUser) {
+  if (loadingAuth) {
     return (
-      <>
-        <Header
-          cartCount={cartItemCount}
-          currentUser={currentUser}
-          onCartClick={() => setIsCartOpen(true)}
-          onUserClick={() => setIsAuthModalOpen(true)}
-          onLogout={handleLogout}
-        />
-        <CheckoutPage 
-          user={currentUser}
-          cartItems={cartItems}
-          onPlaceOrder={handlePlaceOrder}
-          onClose={() => setIsCheckoutOpen(false)}
-        />
-        <Footer />
-      </>
-    )
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        fontSize: '24px',
+        color: '#666'
+      }}>
+        Loading authentication status...
+      </div>
+    );
   }
 
   return (
@@ -133,25 +152,64 @@ const App: React.FC = () => {
         onUserClick={() => setIsAuthModalOpen(true)}
         onLogout={handleLogout}
       />
-      <main>
-        <Hero />
-        <Features />
-        <ProductCategories />
-        <ProductShowcase onProductSelect={setSelectedProduct} />
-        <About />
-        <AiAssistant />
-      </main>
-      <Footer />
-      
-      {/* Modals and Sidebars */}
+
+      <Routes>
+        <Route path="/" element={
+          <>
+            <main>
+              <Hero />
+              <Features />
+              <ProductCategories />
+              <ProductShowcase onProductSelect={setSelectedProduct} />
+              <About />
+              <AiAssistant />
+            </main>
+            <Footer />
+          </>
+        } />
+
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route path="/checkout" element={
+          <PrivateRoute user={currentUser}>
+            <CheckoutPage
+              user={currentUser}
+              cartItems={cartItems}
+              onPlaceOrder={handlePlaceOrder}
+              onClose={() => navigate('/')}
+            />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin" element={
+          <PrivateRoute user={currentUser}>
+            <AdminPage />
+          </PrivateRoute>
+        } />
+        <Route path="/admin/products" element={
+          <PrivateRoute user={currentUser}>
+            <ProductManagement />
+          </PrivateRoute>
+        } />
+        <Route path="/admin/members" element={
+          <PrivateRoute user={currentUser}>
+            <MemberManagement />
+          </PrivateRoute>
+        } />
+        <Route path="/admin/orders" element={
+          <PrivateRoute user={currentUser}>
+            <OrderManagement />
+          </PrivateRoute>
+        } />
+      </Routes>
+
       {selectedProduct && (
-        <ProductModal 
-          product={selectedProduct} 
+        <ProductModal
+          product={selectedProduct}
           onClose={handleCloseModal}
           onAddToCart={handleAddToCart}
         />
       )}
-      
       <Cart
         isOpen={isCartOpen}
         items={cartItems}
@@ -160,7 +218,6 @@ const App: React.FC = () => {
         onRemoveItem={handleRemoveFromCart}
         onCheckout={handleCheckout}
       />
-
       {isAuthModalOpen && (
         <AuthModal
           onClose={() => setIsAuthModalOpen(false)}
@@ -168,9 +225,16 @@ const App: React.FC = () => {
           onRegister={handleRegister}
         />
       )}
-
       {toastMessage && <Toast message={toastMessage} />}
     </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   );
 };
 

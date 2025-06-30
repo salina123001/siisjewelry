@@ -1,16 +1,18 @@
 // services/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyDJv-tGxJWO-lXh4m0E0KOqKdMDfFQ60Pw',
-  authDomain: 'siis-jewelry.firebaseapp.com',
-  projectId: 'siis-jewelry',
-  storageBucket: 'siis-jewelry.appspot.com',
-  messagingSenderId: '301795449698',
-  appId: '1:301795449698:web:d8d1f3eab5fb57a8ce2a3b',
-  measurementId: 'G-G2J4KKPDK3',
+  apiKey: "AIzaSyBVwk6N0mRimPMZ_hnDYZZaQ5cqcPXf61M",
+  authDomain: "siis-jewelry-5c370.firebaseapp.com",
+  projectId: "siis-jewelry-5c370",
+  storageBucket: "siis-jewelry-5c370.firebasestorage.app",
+  messagingSenderId: "88460482323",
+  appId: "1:88460482323:web:b6a59a4e537a6a4cf86ce6",
+  measurementId: "G-NPDXXFYHBX"
 };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
